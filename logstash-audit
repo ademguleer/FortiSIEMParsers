@@ -1,0 +1,60 @@
+<patternDefinitions>
+	<pattern name="patAppContent"><![CDATA[.+?]]></pattern>
+	<pattern name="patName"><![CDATA[[^}]+]]></pattern>
+	<pattern name="patTimeMs"><![CDATA[\d{2}:\d{2}:\d{2}\.\d+]]></pattern>
+	<pattern name="patCommand"><![CDATA[.*]]></pattern>
+	<pattern name="patCommandPath"><![CDATA[[^,]+,[^,]+]]></pattern>
+</patternDefinitions>
+<eventFormatRecognizer><![CDATA[LOGSTASH\[-\]:]]></eventFormatRecognizer>
+<parsingInstructions>
+	<switch>
+		<case>
+			<collectFieldsByRegex src="$_rawmsg">
+				<regex><![CDATA[LOGSTASH\[-\]:.*?\{name=<hostName:patName>\}\s+time=<_year:gPatYear>-<_mon:gPatMonNum>-<_day:gPatDay>\s+<_time:patTimeMs>\s+\+\d+\s+app=(?:\[unknown\]|<srcApp:patAppContent>)\s+host=(?:\[local\]|<srcIpAddr:gPatIpAddr>)\s+user=<user:gPatStr>\s+db=<dbObjName:gPatStr>\s+pid=<procId:gPatInt><_body:gPatMesgBody>]]></regex>
+			</collectFieldsByRegex>
+		</case>
+		<case>
+			<collectFieldsByRegex src="$_rawmsg">
+				<regex><![CDATA[LOGSTASH\[-\]:.*?\{name=<hostName:patName>\}\s+time=<_year:gPatYear>-<_mon:gPatMonNum>-<_day:gPatDay>\s+<_time:patTimeMs><_body:gPatMesgBody>]]></regex>
+			</collectFieldsByRegex>
+		</case>
+	</switch>
+	<switch>
+		<!-- AUDIT -->
+		<case>
+			<collectFieldsByRegex src="$_body">
+				<regex><![CDATA[.*?AUDIT: SESSION,[^,]*,[^,]*,<commandPath:patCommandPath>,[^,]*,[^,]*,(?:")?<command:patCommand>]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="eventType">PostgreSQL-Audit</setEventAttribute>
+		</case>
+		<!-- LOG -->
+		<case>
+			<collectFieldsByRegex src="$_body">
+				<regex><![CDATA[.*?LOG:\s+connection received: host=<srcIpAddr:gPatIpV4Dot> port=<srcDevPort:gPatStr>]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="eventType">PostgreSQL-Connection-Received</setEventAttribute>
+		</case>
+		<case>
+			<collectFieldsByRegex src="$_body">
+				<regex><![CDATA[.*?LOG:\s+disconnection:\s+session time:\s+<DurationTime:gPatStr>]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="eventType">PostgreSQL-Disconnection    </setEventAttribute>
+		</case>
+		<case>
+			<collectFieldsByRegex src="$_body">
+				<regex><![CDATA[.*?LOG:\s+connection authorized:\s+user=<user:gPatStr>\s+database=<dbObjName:gPatStr>(?:\s+application_name=<appName:gPatStr>)?]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="eventType">PostgreSQL-Connection-Authorized</setEventAttribute>
+		</case>
+	</switch>
+	<choose>
+		<when test="exist _year">
+			<setEventAttribute attr="deviceTime">toDateTime($_mon, $_day, $_year, $_time)</setEventAttribute>
+		</when>
+	</choose>
+	<choose>
+		<when test="not_exist srcApp">
+			<setEventAttribute attr="srcApp">PostgreSQL</setEventAttribute>
+		</when>
+	</choose>
+</parsingInstructions>
