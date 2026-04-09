@@ -1,0 +1,216 @@
+<deviceFormat>
+	<eventFormatRecognizer><![CDATA[tpot_]]></eventFormatRecognizer>
+	<patternDefinitions>
+		<pattern name="patPri"><![CDATA[<\d+>]]></pattern>
+		<pattern name="patTime"><![CDATA[[^\s]+]]></pattern>
+		<pattern name="patHost"><![CDATA[[^\s]+]]></pattern>
+		<pattern name="patProc"><![CDATA[tpot_[^:]+]]></pattern>
+		<pattern name="patJson"><![CDATA[\{.*]]></pattern>
+		<pattern name="patStr"><![CDATA[[^"]+]]></pattern>
+	</patternDefinitions>
+	<parsingInstructions>
+		<switch>
+			<case>
+				<collectFieldsByRegex src="$_rawmsg">
+					<regex><![CDATA[^<_pri:patPri><_logTime:patTime>\s+<hostName:patHost>\s+<procName:patProc>:\s+<_body:patJson>]]></regex>
+				</collectFieldsByRegex>
+				<setEventAttribute attr="deviceTime">toDateTime($_logTime)</setEventAttribute>
+			</case>
+			<default>
+				<collectFieldsByRegex src="$_rawmsg">
+					<regex><![CDATA[<procName:patProc>:\s+<_body:patJson>]]></regex>
+				</collectFieldsByRegex>
+			</default>
+		</switch>
+		<choose>
+			<when test="$procName = 'tpot_suricata'">
+				<setEventAttribute attr="eventType">Tpot-Suricata-Alert</setEventAttribute>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["src_ip"\s*:\s*"<srcIpAddr:gPatIpV4Dot>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["dest_ip"\s*:\s*"<destIpAddr:gPatIpV4Dot>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["src_port"\s*:\s*<srcIpPort:gPatInt>]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["dest_port"\s*:\s*<destIpPort:gPatInt>]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["proto"\s*:\s*"<ipProto:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["signature"\s*:\s*"<_sigName:patStr>"]]></regex>
+						</collectFieldsByRegex>
+						<setEventAttribute attr="eventName">$_sigName</setEventAttribute>
+						<setEventAttribute attr="signatureName">$_sigName</setEventAttribute>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["category"\s*:\s*"<alertCategory:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["cve"\s*:\s*\["<vulnCVEId:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["action"\s*:\s*"<eventAction:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+			</when>
+			<when test="$procName = 'tpot_p0f'">
+				<setEventAttribute attr="eventType">Tpot-P0f-Event</setEventAttribute>
+				<setEventAttribute attr="eventName">Passive OS Fingerprinting</setEventAttribute>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["client_ip"\s*:\s*"<srcIpAddr:gPatIpV4Dot>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["server_ip"\s*:\s*"<destIpAddr:gPatIpV4Dot>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["client_port"\s*:\s*<srcIpPort:gPatInt>]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["server_port"\s*:\s*<destIpPort:gPatInt>]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["mod"\s*:\s*"<eventAction:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["link"\s*:\s*"<eventCategory:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+			</when>
+			<when test="$procName = 'tpot_cowrie'">
+				<setEventAttribute attr="eventType">Tpot-Cowrie-Event</setEventAttribute>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["eventid"\s*:\s*"<eventName:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["src_ip"\s*:\s*"<srcIpAddr:gPatIpV4Dot>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["dst_ip"\s*:\s*"<destIpAddr:gPatIpV4Dot>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["src_port"\s*:\s*<srcIpPort:gPatInt>]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["dst_port"\s*:\s*<destIpPort:gPatInt>]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["protocol"\s*:\s*"<ipProto:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+				<switch>
+					<case>
+						<collectFieldsByRegex src="$_body">
+							<regex><![CDATA["message"\s*:\s*"<_eventDesc:patStr>"]]></regex>
+						</collectFieldsByRegex>
+					</case>
+					<default/>
+				</switch>
+			</when>
+		</choose>
+	</parsingInstructions>
+</deviceFormat>
