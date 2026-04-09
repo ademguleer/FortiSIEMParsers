@@ -1,0 +1,145 @@
+<eventFormatRecognizer><![CDATA[\b(?:logportalauth|php-fpm|dma|php)(?:\[[^\]]+\])+:|\d{2}:\d{2}:\d{2}\s+nginx:|\b(?:logportalauth|php-fpm|dma|php)\s+\d+\s+-\s+-]]></eventFormatRecognizer>
+<patternDefinitions>
+	<pattern name="patCoslotTime"><![CDATA[\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:[+-]\d{2}:\d{2}|Z)]]></pattern>
+	<pattern name="patProcName"><![CDATA[[^\[\s:]+]]></pattern>
+	<pattern name="patAction"><![CDATA[[A-Z_]+]]></pattern>
+	<pattern name="patIP"><![CDATA[\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}]]></pattern>
+	<pattern name="patEmail"><![CDATA[[^,\s]+(?:%40|@)[^,\s]+]]></pattern>
+	<pattern name="patId"><![CDATA[\d+]]></pattern>
+	<pattern name="patInt"><![CDATA[\d+]]></pattern>
+	<pattern name="patNginxUrl"><![CDATA[[^\s"]+]]></pattern>
+	<pattern name="patQuote"><![CDATA[[^"]*]]></pattern>
+</patternDefinitions>
+<parsingInstructions>
+	<setEventAttribute attr="eventType">Coslot-Generic</setEventAttribute>
+	<switch>
+		<case>
+			<collectFieldsByRegex src="$_rawmsg">
+				<regex><![CDATA[^(?:\<\d+\>\s*)?(?:\d+\s+)?<_logTime:patCoslotTime>\s+<hostName:gPatHostName>\s+<procName:patProcName>\s+<_pid:gPatInt>(?:\s+-\s+-)?\s+<_body:gPatMesgBody>]]></regex>
+			</collectFieldsByRegex>
+		</case>
+		<case>
+			<collectFieldsByRegex src="$_rawmsg">
+				<regex><![CDATA[^(?:\<\d+\>\s*)?<_mon:gPatMon>\s+<_day:gPatDay>\s+<_time:gPatTime>\s+<hostName:gPatHostName>\s+<procName:patProcName>(?:\[[^\]]+\])+:\s+<_body:gPatMesgBody>]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="deviceTime">toDateTime($_mon, $_day, 2026, $_time)</setEventAttribute>
+		</case>
+		<case>
+			<collectFieldsByRegex src="$_rawmsg">
+				<regex><![CDATA[^(?:\<\d+\>\s*)?<_mon:gPatMon>\s+<_day:gPatDay>\s+<_time:gPatTime>\s+<hostName:gPatHostName>\s+<procName:patProcName>:\s+<_body:gPatMesgBody>]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="deviceTime">toDateTime($_mon, $_day, 2026, $_time)</setEventAttribute>
+		</case>
+		<case>
+			<collectFieldsByRegex src="$_rawmsg">
+				<regex><![CDATA[^(?:\<\d+\>\s*)?<_mon:gPatMon>\s+<_day:gPatDay>\s+<_time:gPatTime>\s+<procName:patProcName>(?:\[[^\]]+\])+:\s+<_body:gPatMesgBody>]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="deviceTime">toDateTime($_mon, $_day, 2026, $_time)</setEventAttribute>
+		</case>
+		<case>
+			<collectFieldsByRegex src="$_rawmsg">
+				<regex><![CDATA[^(?:\<\d+\>\s*)?<_mon:gPatMon>\s+<_day:gPatDay>\s+<_time:gPatTime>\s+<procName:patProcName>:\s+<_body:gPatMesgBody>]]></regex>
+			</collectFieldsByRegex>
+			<setEventAttribute attr="deviceTime">toDateTime($_mon, $_day, 2026, $_time)</setEventAttribute>
+		</case>
+	</switch>
+	<choose>
+		<when test="$procName = 'nginx'">
+			<setEventAttribute attr="eventType">Coslot-Nginx-Access</setEventAttribute>
+			<switch>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[^<srcIpAddr:patIP>\s+\S+\s+\S+\s+\[.*?\]\s+"<httpMethod:patAction>\s+<url:patNginxUrl>[^"]*"\s+<httpStatusCode:patInt>\s+<sentBytes:patInt>\s+"<_referer:patQuote>"\s+"<httpUserAgent:patQuote>"]]></regex>
+					</collectFieldsByRegex>
+				</case>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[^<srcIpAddr:patIP>\s+\S+\s+\S+\s+\[.*?\]\s+"<httpMethod:patAction>\s+<url:patNginxUrl>[^"]*"\s+<httpStatusCode:patInt>\s+-\s+"<_referer:patQuote>"\s+"<httpUserAgent:patQuote>"]]></regex>
+					</collectFieldsByRegex>
+				</case>
+				<default>
+					<setEventAttribute attr="msg">$_body</setEventAttribute>
+				</default>
+			</switch>
+		</when>
+		<when test="$procName = 'logportalauth'">
+			<switch>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[^<_action:patAction>:\s*<srcId:patId>\s*,]]></regex>
+					</collectFieldsByRegex>
+					<setEventAttribute attr="eventType">combineMsgId("Coslot_", $_action)</setEventAttribute>
+				</case>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[^<_action:patAction>:]]></regex>
+					</collectFieldsByRegex>
+					<setEventAttribute attr="eventType">combineMsgId("Coslot_", $_action)</setEventAttribute>
+				</case>
+			</switch>
+			<switch>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[,\s*<srcIpAddr:patIP>\s*,]]></regex>
+					</collectFieldsByRegex>
+				</case>
+				<default/>
+			</switch>
+			<switch>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[,\s*<_rawEmail:patEmail>\s*,]]></regex>
+					</collectFieldsByRegex>
+					<setEventAttribute attr="user">replaceStringByRegex($_rawEmail, "%40", "@")</setEventAttribute>
+				</case>
+				<default/>
+			</switch>
+		</when>
+		<when test="$procName = 'php-fpm'">
+			<setEventAttribute attr="eventType">Coslot-PHP-FPM</setEventAttribute>
+			<switch>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[Message sent to\s+<user:patEmail>]]></regex>
+					</collectFieldsByRegex>
+				</case>
+				<default/>
+			</switch>
+		</when>
+		<when test="$procName = 'dma'">
+			<setEventAttribute attr="eventType">Coslot-DMA</setEventAttribute>
+			<setEventAttribute attr="msg">$_body</setEventAttribute>
+			<switch>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[^new mail from user=<user:gPatStr>\s+uid=<userId:gPatInt>]]></regex>
+					</collectFieldsByRegex>
+					<setEventAttribute attr="eventType">Coslot-DMA-New-Mail</setEventAttribute>
+				</case>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[^delivery successful]]></regex>
+					</collectFieldsByRegex>
+					<setEventAttribute attr="eventType">Coslot-DMA-Delivery-Success</setEventAttribute>
+				</case>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[^trying delivery]]></regex>
+					</collectFieldsByRegex>
+					<setEventAttribute attr="eventType">Coslot-DMA-Delivery-Try</setEventAttribute>
+				</case>
+			</switch>
+		</when>
+		<when test="$procName = 'php'">
+			<setEventAttribute attr="eventType">Coslot-PHP-Alert</setEventAttribute>
+			<switch>
+				<case>
+					<collectFieldsByRegex src="$_body">
+						<regex><![CDATA[PHP ERROR:\s+Type:\s+<_errType:gPatInt>,\s+File:\s+<fileName:gPatStr>,\s+Line:\s+<_line:gPatInt>,\s+Message:\s+<eventDesc:gPatMesgBody>]]></regex>
+					</collectFieldsByRegex>
+					<setEventAttribute attr="eventType">Coslot-PHP-Error</setEventAttribute>
+				</case>
+			</switch>
+		</when>
+	</choose>
+</parsingInstructions>
